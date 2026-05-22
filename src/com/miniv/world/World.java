@@ -1,9 +1,10 @@
 package com.miniv.world;
 
+import com.miniv.core.SupabaseMultiplayer;
+
 public class World {
     public static final int CHUNK_SIZE = 16;
     private java.util.concurrent.ConcurrentHashMap<Long, Chunk> chunks = new java.util.concurrent.ConcurrentHashMap<>();
-    private java.util.concurrent.ConcurrentHashMap<String, Byte> blockHistory = new java.util.concurrent.ConcurrentHashMap<>();
 
     private long getChunkKey(int cx, int cz) {
         return (((long) cx) << 32) | (cz & 0xffffffffL);
@@ -50,9 +51,10 @@ public class World {
                 h = Math.max(1, Math.min(com.miniv.core.Config.worldHeight - 1, h));
 
                 for (int y = 0; y <= h; y++) {
-                    String blockKey = (int)gx + "," + y + "," + (int)gz;
-                    if (blockHistory.containsKey(blockKey)) {
-                        chunk.setBlockLocal(x, y, z, blockHistory.get(blockKey));
+                    String blockKey = (int) gx + "," + y + "," + (int) gz;
+                    Byte placed = SupabaseMultiplayer.sessionBlocks.get(blockKey);
+                    if (placed != null) {
+                        chunk.setBlockLocal(x, y, z, placed);
                         continue;
                     }
                     if (y == h) {
@@ -63,6 +65,28 @@ public class World {
                         chunk.setBlockLocal(x, y, z, Voxel.STONE);
                     }
                 }
+            }
+        }
+        applySessionBlocksToChunk(chunk);
+    }
+
+    /** Apply placed/broken blocks at any height (including above terrain). */
+    private void applySessionBlocksToChunk(Chunk chunk) {
+        int baseX = chunk.cx * CHUNK_SIZE;
+        int baseZ = chunk.cz * CHUNK_SIZE;
+        for (var e : SupabaseMultiplayer.sessionBlocks.entrySet()) {
+            String[] p = e.getKey().split(",");
+            if (p.length != 3) continue;
+            try {
+                int gx = Integer.parseInt(p[0]);
+                int gy = Integer.parseInt(p[1]);
+                int gz = Integer.parseInt(p[2]);
+                if (gx < baseX || gx >= baseX + CHUNK_SIZE || gz < baseZ || gz >= baseZ + CHUNK_SIZE)
+                    continue;
+                int lx = gx - baseX;
+                int lz = gz - baseZ;
+                chunk.setBlockLocal(lx, gy, lz, e.getValue());
+            } catch (NumberFormatException ignored) {
             }
         }
     }
@@ -84,8 +108,7 @@ public class World {
     public void setBlock(int gx, int gy, int gz, byte block) {
         if (gy < 0 || gy >= com.miniv.core.Config.worldHeight) return;
         
-        String histKey = gx + "," + gy + "," + gz;
-        blockHistory.put(histKey, block);
+        SupabaseMultiplayer.recordBlock(gx, gy, gz, block);
 
         int cx = (int) Math.floor((float) gx / CHUNK_SIZE);
         int cz = (int) Math.floor((float) gz / CHUNK_SIZE);

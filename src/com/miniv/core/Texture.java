@@ -19,11 +19,13 @@ public class Texture {
     private static Map<String, Integer> textureIndices = new HashMap<>();
     
     private static final String[] TEXTURE_FILES = {
-        "Dirt.png", "Grass.png", "Grass_side.png", 
-        "Sand.png", "Stone.png", "Wood.png", 
+        "Dirt.png", "Grass.png", "Grass_side.png",
+        "Sand.png", "Stone.png", "Wood.png",
         "Leaves.png", "Plank.png", "Water.png",
-        "player.png", "Player_back.png", 
-        "Player_left_right.png", "Player_top.png"
+        "player.png", "Player_back.png",
+        "Player_left_right.png", "Player_top.png",
+        "Quiz_block.png", "Info_block.png",
+        "Teleportal_block.png", "Attendance_block.png"
     };
 
     public static void init() {

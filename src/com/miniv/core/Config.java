@@ -1,11 +1,29 @@
 package com.miniv.core;
 
 public class Config {
-    // Zoom Settings — default zoomed out enough to see the infinite terrain
-    public static float zoom = 18.0f;
+    public static float zoom = 3.0f;
 
     // Shade Settings - 0: Off, 1: Low, 2: Medium, 3: High, 4: Lock
     public static int shadeQuality = 0;
+
+    /**
+     * Night brightness 0–1. Lifts how dark night gets while keeping day/night cycle
+     * (day stays bright, night stays dimmer — never fully equal).
+     */
+    public static float brightness = 0.25f;
+
+    private static final float NIGHT_LIGHT = 0.2f;
+    private static final float DAY_LIGHT = 1.0f;
+    /** Darkest night can get at 100% brightness (still below full day). */
+    private static final float MAX_NIGHT_FLOOR = 0.72f;
+
+    public static float applyBrightness(float skyLight) {
+        float nightFloor = NIGHT_LIGHT + brightness * (MAX_NIGHT_FLOOR - NIGHT_LIGHT);
+        if (skyLight <= NIGHT_LIGHT) return nightFloor;
+        if (skyLight >= DAY_LIGHT) return DAY_LIGHT;
+        float t = (skyLight - NIGHT_LIGHT) / (DAY_LIGHT - NIGHT_LIGHT);
+        return nightFloor + t * (DAY_LIGHT - nightFloor);
+    }
 
     // Active block the player places with RMB
     public static int activeBlockIndex = 0;
@@ -19,11 +37,23 @@ public class Config {
         com.miniv.world.Voxel.LEAVES,
         com.miniv.world.Voxel.LOG,
         com.miniv.world.Voxel.GRASS,
+        com.miniv.world.Voxel.QUIZ_BLOCK,
+        com.miniv.world.Voxel.INFO_BLOCK,
+        com.miniv.world.Voxel.TELEPORT_BLOCK,
+        com.miniv.world.Voxel.ATTENDANCE_BLOCK,
+        com.miniv.world.Voxel.NPC_SPAWNER
     };
     public static final String[] placeableNames = {
-        "Wood", "Stone", "Cobble", "Dirt", "Gravel", "Sand", "Leaves", "Log", "Grass"
+        "Wood", "Stone", "Cobble", "Dirt", "Gravel", "Sand", "Leaves", "Log", "Grass",
+        "Quiz", "Info", "Teleport", "Attendance", "NPC Spawner"
     };
-    public static byte getActiveBlock() { return placeableBlocks[activeBlockIndex]; }
+    
+    public static final int HOTBAR_SIZE = 9;
+
+    // Hotbar slots hold indexes into placeableBlocks (13 blocks total; use E inventory for slots 10+)
+    public static int[] hotbarSlots = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    
+    public static byte getActiveBlock() { return placeableBlocks[hotbarSlots[activeBlockIndex]]; }
     
     // Day cycle speed (how many real seconds per game day)
     public static float dayLengthSeconds = 60.0f; // Fast cycle for testing

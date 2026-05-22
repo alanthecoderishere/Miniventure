@@ -11,6 +11,12 @@ public class Player extends Entity {
     private float velocityY = 0.0f;
     private boolean onGround = false;
 
+    public void landAt(float x, float y, float z) {
+        position.set(x, y, z);
+        velocityY = 0.0f;
+        onGround = true;
+    }
+
     public void update(float delta, World world) {
         float dx = 0;
         float dz = 0;
