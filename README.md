@@ -39,40 +39,38 @@ MiniVenture is a premium isometric voxel engine built from scratch using **Java*
 ### Prerequisites
 - Java Development Kit (JDK) 17 or higher.
 
-### Option A — Runnable JAR (recommended for sharing)
-If you have the `lib/` folder (from a full dev copy) or after downloading deps:
-
+### Quick Run (macOS & Linux)
+Open your terminal and run:
 ```bash
-chmod +x build_jar.sh download_libs.sh
-./download_libs.sh   # only if lib/ is missing
-./build_jar.sh
-cd dist && ./run.sh          # macOS / Linux
-cd dist && run.bat           # Windows (double-click or cmd)
-```
-
-Share the **`dist/`** folder (`MiniVenture.jar`, `assets/`, `run.sh`, `run.bat`). Recipients only need Java installed.
-
-`lib/`, `build/`, and `dist/` are not in git — build locally.
-
-### Option B — Dev run (macOS)
-```bash
-chmod +x run_game.sh download_libs.sh
-./download_libs.sh   # if lib/ is missing
+chmod +x run_game.sh
 ./run_game.sh
 ```
 
-### Option C — Compile manually
+### Quick Run (Windows)
+Just double-click **`run_game.bat`** or run it from the Command Prompt:
+```cmd
+run_game.bat
+```
+
+### Manual Compilation
+If you prefer compiling manually:
 ```bash
+# macOS/Linux:
 javac -d bin -cp "lib/*" $(find src -name "*.java")
-java -XstartOnFirstThread -cp "bin:lib/*" com.miniv.core.Main   # macOS
+java -XstartOnFirstThread --enable-native-access=ALL-UNNAMED -cp "bin:lib/*" com.miniv.core.Main
+
+# Windows (Command Prompt):
+dir /s /B src\*.java > sources.txt
+javac -d bin -cp "lib/*" @sources.txt
+del sources.txt
+java --enable-native-access=ALL-UNNAMED -cp "bin;lib/*" com.miniv.core.Main
 ```
 
 ## 📂 Project Structure
 - `src/`: Java source files.
 - `assets/`: Textures and shaders.
-- `lib/`: LWJGL and JOML libraries (local only; run `download_libs.sh`).
-- `build_jar.sh` / `dist/`: Packaged game JAR (local only).
-- `run_game.sh`: Launch script for macOS dev.
+- `lib/`: Pre-packaged LWJGL and JOML libraries.
+- `run_game.sh` / `run_game.bat`: Quick launch scripts.
 
 ---
 Developed by **alanthecoderishere**
