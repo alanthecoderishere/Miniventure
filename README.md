@@ -38,28 +38,41 @@ MiniVenture is a premium isometric voxel engine built from scratch using **Java*
 
 ### Prerequisites
 - Java Development Kit (JDK) 17 or higher.
-- macOS (Script provided) or other OS with LWJGL 3 support.
 
-### Running on macOS
-Simply run the provided shell script:
+### Option A — Runnable JAR (recommended for sharing)
+If you have the `lib/` folder (from a full dev copy) or after downloading deps:
+
 ```bash
-chmod +x run_game.sh
+chmod +x build_jar.sh download_libs.sh
+./download_libs.sh   # only if lib/ is missing
+./build_jar.sh
+cd dist && ./run.sh          # macOS / Linux
+cd dist && run.bat           # Windows (double-click or cmd)
+```
+
+Share the **`dist/`** folder (`MiniVenture.jar`, `assets/`, `run.sh`, `run.bat`). Recipients only need Java installed.
+
+`lib/`, `build/`, and `dist/` are not in git — build locally.
+
+### Option B — Dev run (macOS)
+```bash
+chmod +x run_game.sh download_libs.sh
+./download_libs.sh   # if lib/ is missing
 ./run_game.sh
 ```
 
-### Running on other platforms
-Compile the source and include all libraries in the `lib/` folder in your classpath:
+### Option C — Compile manually
 ```bash
 javac -d bin -cp "lib/*" $(find src -name "*.java")
-java -cp "bin:lib/*" com.miniv.core.Main
+java -XstartOnFirstThread -cp "bin:lib/*" com.miniv.core.Main   # macOS
 ```
-*(Note: On macOS, `-XstartOnFirstThread` is required).*
 
 ## 📂 Project Structure
 - `src/`: Java source files.
 - `assets/`: Textures and shaders.
-- `lib/`: LWJGL and JOML libraries.
-- `run_game.sh`: Launch script for macOS.
+- `lib/`: LWJGL and JOML libraries (local only; run `download_libs.sh`).
+- `build_jar.sh` / `dist/`: Packaged game JAR (local only).
+- `run_game.sh`: Launch script for macOS dev.
 
 ---
 Developed by **alanthecoderishere**

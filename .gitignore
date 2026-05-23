@@ -1,12 +1,14 @@
 # Java
 *.class
-*.jar
 *.war
 *.ear
 
 # Build
 bin/
 out/
+build/
+dist/
+lib/
 
 # IDEs
 .vscode/
