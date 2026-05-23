@@ -8,7 +8,6 @@ bin/
 out/
 build/
 dist/
-lib/
 
 # IDEs
 .vscode/
@@ -17,6 +16,7 @@ lib/
 
 # OS
 .DS_Store
+**/.DS_Store
 
 # Logs
 *.log
