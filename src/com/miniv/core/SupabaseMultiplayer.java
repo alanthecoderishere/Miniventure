@@ -63,6 +63,22 @@ public class SupabaseMultiplayer {
     /** Join/leave and other MP notices shown in the in-game chat box. */
     public static final ConcurrentLinkedQueue<String> pendingNotifications = new ConcurrentLinkedQueue<>();
 
+    /**
+     * Thread-safe queue: Network Thread menulis, Main/Render Thread membaca.
+     * Pola ini (Lock-Free Command Pattern) menghindari synchronized block
+     * yang dapat memblokir LWJGL render thread.
+     */
+    public static class PlayerMoveEvent {
+        final String id, name, dir, state;
+        final double x, y, z;
+        PlayerMoveEvent(String id, String name, double x, double y, double z, String dir, String state) {
+            this.id = id; this.name = name;
+            this.x = x; this.y = y; this.z = z;
+            this.dir = dir; this.state = state;
+        }
+    }
+    public static final ConcurrentLinkedQueue<PlayerMoveEvent> pendingMoves = new ConcurrentLinkedQueue<>();
+
     /** All block changes this session — used for late-join sync and chunk generation. */
     public static final ConcurrentHashMap<String, Byte> sessionBlocks = new ConcurrentHashMap<>();
 
@@ -728,6 +744,9 @@ public class SupabaseMultiplayer {
     // Paket:
     // {"type":"pos","id":"string","name":"string","x":double,"y":double,"z":double,"dir":"string","state":"string"}
     private static void handlePlayerPos(String json) {
+        // [THREAD-SAFE] Network Thread hanya membaca JSON dan melempar event ke queue.
+        // Ia TIDAK menyentuh remotePlayers secara langsung.
+        // Main/Render Thread yang akan memprosesnya di updatePlayers().
         String id = extractString(json, "id");
         String name = extractString(json, "name");
         String dir = extractString(json, "dir");
@@ -739,40 +758,11 @@ public class SupabaseMultiplayer {
         if (id == null || x == null || y == null)
             return;
         if (id.equals(localId))
-            return; // abaikan pesan dari diri sendiri
+            return;
 
         double finalZ = (z != null) ? z : y;
-
-        RemotePlayer rp = remotePlayers.get(id);
-        if (rp != null) {
-            rp.name = name != null ? name : rp.name;
-            rp.targetX = x;
-            rp.targetY = y;
-            rp.targetZ = finalZ;
-            rp.dir = dir != null ? dir : rp.dir;
-            rp.state = state != null ? state : rp.state;
-            rp.lastSeenMs = System.currentTimeMillis();
-            
-            // If it's too far (e.g. teleported), snap instead of lerp
-            double dx = rp.targetX - rp.renderX;
-            double dy = rp.targetY - rp.renderY;
-            double dz = rp.targetZ - rp.renderZ;
-            if (dx*dx + dy*dy + dz*dz > 25.0) { // distance > 5
-                rp.renderX = rp.targetX;
-                rp.renderY = rp.targetY;
-                rp.renderZ = rp.targetZ;
-            }
-        } else {
-            // Player baru muncul
-            String displayName = name != null ? name : "???";
-            remotePlayers.put(id, new RemotePlayer(
-                    id,
-                    displayName,
-                    x, y, finalZ,
-                    dir != null ? dir : "down",
-                    state != null ? state : "idle"));
-            notifyPlayerJoined(displayName);
-        }
+        // Lempar ke antrian — ConcurrentLinkedQueue.add() adalah lock-free dan aman dari thread manapun.
+        pendingMoves.add(new PlayerMoveEvent(id, name, x, y, finalZ, dir, state));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -823,9 +813,44 @@ public class SupabaseMultiplayer {
     // ═════════════════════════════════════════════════════════════════════════
 
     public static void updatePlayers(float delta) {
+        // ── Fase 1: Drain queue dari Network Thread (Lock-Free, hanya di Main Thread) ──
+        PlayerMoveEvent move;
+        while ((move = pendingMoves.poll()) != null) {
+            RemotePlayer rp = remotePlayers.get(move.id);
+            if (rp != null) {
+                // Update target — hanya field primitif, aman tanpa synchronized
+                if (move.name != null) rp.name = move.name;
+                rp.targetX = move.x;
+                rp.targetY = move.y;
+                rp.targetZ = move.z;
+                if (move.dir != null) rp.dir = move.dir;
+                if (move.state != null) rp.state = move.state;
+                rp.lastSeenMs = System.currentTimeMillis();
+
+                // Snap jika jarak terlalu jauh (misal: teleport)
+                double dx = move.x - rp.renderX;
+                double dy = move.y - rp.renderY;
+                double dz = move.z - rp.renderZ;
+                if (dx*dx + dy*dy + dz*dz > 25.0) {
+                    rp.renderX = move.x;
+                    rp.renderY = move.y;
+                    rp.renderZ = move.z;
+                }
+            } else {
+                // Player baru — daftarkan ke map
+                String displayName = move.name != null ? move.name : "???";
+                remotePlayers.put(move.id, new RemotePlayer(
+                        move.id, displayName,
+                        move.x, move.y, move.z,
+                        move.dir != null ? move.dir : "down",
+                        move.state != null ? move.state : "idle"));
+                notifyPlayerJoined(displayName);
+            }
+        }
+
+        // ── Fase 2: Lerp semua player render position menuju target (GC-Free, primitif) ──
         for (RemotePlayer rp : remotePlayers.values()) {
             if (!rp.initialized) continue;
-            // Lerp render towards target (speed 10.0 gives smooth follow)
             rp.renderX += (rp.targetX - rp.renderX) * 10.0f * delta;
             rp.renderY += (rp.targetY - rp.renderY) * 10.0f * delta;
             rp.renderZ += (rp.targetZ - rp.renderZ) * 10.0f * delta;

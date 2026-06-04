@@ -33,6 +33,8 @@ public class Renderer {
     private final int[] playerMeshVbos = new int[4];
     private boolean playerMeshesReady = false;
 
+    private final org.joml.Vector3f tempPos = new org.joml.Vector3f();
+
     public void init() {
         shader = new Shader3D();
         shader2D = new Shader2D();
@@ -110,7 +112,8 @@ public class Renderer {
 
         for (com.miniv.core.NPCEntity npc : com.miniv.core.NPCManager.getAll()) {
             drawPlayerBody(npc.position.x, npc.position.y, npc.position.z, npc.facing);
-            projView.project(new org.joml.Vector3f(npc.position.x + 0.5f, npc.position.y + 1.2f, npc.position.z + 0.5f), viewport, dest);
+            tempPos.set(npc.position.x + 0.5f, npc.position.y + 1.2f, npc.position.z + 0.5f);
+            projView.project(tempPos, viewport, dest);
             if (dest.z >= 0.0f && dest.z <= 1.0f) {
                 floatingTexts.add(new TextRenderer.FloatingText(npc.name, (int) dest.x, screenHeight - (int) dest.y));
             }
@@ -119,7 +122,8 @@ public class Renderer {
         for (com.miniv.core.SupabaseMultiplayer.RemotePlayer rp : com.miniv.core.SupabaseMultiplayer.remotePlayers.values()) {
             int facing = dirToFacing(rp.dir);
             drawPlayerBody((float) rp.renderX, (float) rp.renderY, (float) rp.renderZ, facing);
-            projView.project(new org.joml.Vector3f((float) rp.renderX + 0.5f, (float) rp.renderY + 1.2f, (float) rp.renderZ + 0.5f), viewport, dest);
+            tempPos.set((float) rp.renderX + 0.5f, (float) rp.renderY + 1.2f, (float) rp.renderZ + 0.5f);
+            projView.project(tempPos, viewport, dest);
             if (dest.z >= 0.0f && dest.z <= 1.0f) {
                 floatingTexts.add(new TextRenderer.FloatingText(rp.name, (int) dest.x, screenHeight - (int) dest.y));
             }
