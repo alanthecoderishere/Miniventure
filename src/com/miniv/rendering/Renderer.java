@@ -65,6 +65,15 @@ public class Renderer {
         // Update frustum culler once per frame
         Matrix4f projView = new Matrix4f(camera.getProjectionMatrix()).mul(camera.getViewMatrix());
         frustumCuller.update(projView);
+        
+        // ── Clean up pruned chunks ──
+        while (!world.prunedChunks.isEmpty()) {
+            Chunk pruned = world.prunedChunks.poll();
+            if (pruned != null) {
+                if (pruned.vao >= 0) org.lwjgl.opengl.GL30.glDeleteVertexArrays(pruned.vao);
+                if (pruned.vbo >= 0) org.lwjgl.opengl.GL15.glDeleteBuffers(pruned.vbo);
+            }
+        }
 
         // ── Render all loaded chunks (isPlayer = 0 → occlusion dithering enabled) ──
         shader.setUniform("isPlayer", 0.0f);
@@ -109,8 +118,8 @@ public class Renderer {
 
         for (com.miniv.core.SupabaseMultiplayer.RemotePlayer rp : com.miniv.core.SupabaseMultiplayer.remotePlayers.values()) {
             int facing = dirToFacing(rp.dir);
-            drawPlayerBody((float) rp.x, (float) rp.y, (float) rp.z, facing);
-            projView.project(new org.joml.Vector3f((float) rp.x + 0.5f, (float) rp.y + 1.2f, (float) rp.z + 0.5f), viewport, dest);
+            drawPlayerBody((float) rp.renderX, (float) rp.renderY, (float) rp.renderZ, facing);
+            projView.project(new org.joml.Vector3f((float) rp.renderX + 0.5f, (float) rp.renderY + 1.2f, (float) rp.renderZ + 0.5f), viewport, dest);
             if (dest.z >= 0.0f && dest.z <= 1.0f) {
                 floatingTexts.add(new TextRenderer.FloatingText(rp.name, (int) dest.x, screenHeight - (int) dest.y));
             }

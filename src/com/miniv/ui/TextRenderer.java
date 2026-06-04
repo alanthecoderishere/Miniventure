@@ -277,6 +277,9 @@ public class TextRenderer {
         g.drawString("— Graphics —", 65, ly); ly += gap;
 
         g.setColor(Color.WHITE);
+        String fpsStr = com.miniv.core.Config.getFpsCap() == -1 ? "VSync" : 
+                        (com.miniv.core.Config.getFpsCap() == 0 ? "Unlimited" : com.miniv.core.Config.getFpsCap() + " FPS");
+        g.drawString("[F] FPS Cap: " + fpsStr, 65, ly); ly += gap;
         g.drawString("[Q] Shadows: " + getShadeString(com.miniv.core.Config.shadeQuality), 65, ly); ly += gap;
         g.drawString("[L] Night brightness: " + (int) (com.miniv.core.Config.brightness * 100)
             + "% (still darker at night)", 65, ly); ly += gap;

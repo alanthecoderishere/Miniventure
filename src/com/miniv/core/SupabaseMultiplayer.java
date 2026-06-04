@@ -26,8 +26,8 @@ public class SupabaseMultiplayer {
     // ─────────────────────────────────────────────────────────────────────────
     // ★ KONFIGURASI — Ganti dengan kredensial Supabase kamu
     // ─────────────────────────────────────────────────────────────────────────
-    private static final String SUPABASE_PROJECT_REF = "ktnbpcksepwzwbowrylq";
-    private static final String SUPABASE_ANON_KEY = "sb_publishable_k1bG9JUK3d-i7JjjXidUjw_pGBFBKQj";
+    public static final String SUPABASE_PROJECT_REF = "ktnbpcksepwzwbowrylq";
+    public static final String SUPABASE_ANON_KEY = "sb_publishable_k1bG9JUK3d-i7JjjXidUjw_pGBFBKQj";
     private static final String CHANNEL_NAME = "room:graduation";
     private static final String TOPIC = "realtime:" + CHANNEL_NAME;
 
@@ -89,17 +89,23 @@ public class SupabaseMultiplayer {
     public static class RemotePlayer {
         public final String id;
         public volatile String name;
-        public volatile double x, y, z;
+        public volatile double targetX, targetY, targetZ;
+        public volatile double renderX, renderY, renderZ;
         public volatile String dir;
         public volatile String state;
         public volatile long lastSeenMs;
+        public volatile boolean initialized;
 
         RemotePlayer(String id, String name, double x, double y, double z, String dir, String state) {
             this.id = id;
             this.name = name;
-            this.x = x;
-            this.y = y;
-            this.z = z;
+            this.targetX = x;
+            this.targetY = y;
+            this.targetZ = z;
+            this.renderX = x;
+            this.renderY = y;
+            this.renderZ = z;
+            this.initialized = true;
             this.dir = dir;
             this.state = state;
             this.lastSeenMs = System.currentTimeMillis();
@@ -454,6 +460,12 @@ public class SupabaseMultiplayer {
         String reqId = extractString(json, "id");
         if (reqId == null || reqId.equals(localId))
             return;
+        
+        // Broadcast local position so the new player sees us immediately
+        if (lastBroadcastDir != null && lastBroadcastState != null) {
+            broadcastPosition(lastBroadcastX, lastBroadcastY, lastBroadcastZ, lastBroadcastDir, lastBroadcastState);
+        }
+        
         long now = System.currentTimeMillis();
         if (now - lastSyncResponseMs < 2000)
             return;
@@ -734,12 +746,22 @@ public class SupabaseMultiplayer {
         RemotePlayer rp = remotePlayers.get(id);
         if (rp != null) {
             rp.name = name != null ? name : rp.name;
-            rp.x = x;
-            rp.y = y;
-            rp.z = finalZ;
+            rp.targetX = x;
+            rp.targetY = y;
+            rp.targetZ = finalZ;
             rp.dir = dir != null ? dir : rp.dir;
             rp.state = state != null ? state : rp.state;
             rp.lastSeenMs = System.currentTimeMillis();
+            
+            // If it's too far (e.g. teleported), snap instead of lerp
+            double dx = rp.targetX - rp.renderX;
+            double dy = rp.targetY - rp.renderY;
+            double dz = rp.targetZ - rp.renderZ;
+            if (dx*dx + dy*dy + dz*dz > 25.0) { // distance > 5
+                rp.renderX = rp.targetX;
+                rp.renderY = rp.targetY;
+                rp.renderZ = rp.targetZ;
+            }
         } else {
             // Player baru muncul
             String displayName = name != null ? name : "???";
@@ -800,10 +822,22 @@ public class SupabaseMultiplayer {
     // 3. SENDER — kirim posisi pemain lokal saat bergerak
     // ═════════════════════════════════════════════════════════════════════════
 
+    public static void updatePlayers(float delta) {
+        for (RemotePlayer rp : remotePlayers.values()) {
+            if (!rp.initialized) continue;
+            // Lerp render towards target (speed 10.0 gives smooth follow)
+            rp.renderX += (rp.targetX - rp.renderX) * 10.0f * delta;
+            rp.renderY += (rp.targetY - rp.renderY) * 10.0f * delta;
+            rp.renderZ += (rp.targetZ - rp.renderZ) * 10.0f * delta;
+        }
+    }
+
+    public static double lastBroadcastX = 0, lastBroadcastY = 0, lastBroadcastZ = 0;
+    public static String lastBroadcastDir = null, lastBroadcastState = null;
+
     /**
      * Broadcast koordinat pemain lokal ke semua pemain di channel.
-     * Panggil ini di game loop setiap kali pemain bergerak (bisa di-throttle ~10
-     * kali/detik).
+     * Panggil ini di game loop setiap kali pemain bergerak.
      *
      * @param x     Posisi X dunia
      * @param y     Posisi Y dunia (tinggi)
@@ -814,6 +848,12 @@ public class SupabaseMultiplayer {
     public static void broadcastPosition(double x, double y, double z, String dir, String state) {
         if (!connected || ws == null || localId == null)
             return;
+            
+        lastBroadcastX = x;
+        lastBroadcastY = y;
+        lastBroadcastZ = z;
+        lastBroadcastDir = dir;
+        lastBroadcastState = state;
 
         // Inner payload
         String payload = "{"

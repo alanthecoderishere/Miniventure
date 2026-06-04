@@ -14,6 +14,8 @@ public class World {
         return chunks.values();
     }
 
+    public java.util.concurrent.ConcurrentLinkedQueue<Chunk> prunedChunks = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
     public void updateChunks(float playerX, float playerZ) {
         int pcx = (int) Math.floor(playerX / CHUNK_SIZE);
         int pcz = (int) Math.floor(playerZ / CHUNK_SIZE);
@@ -34,6 +36,17 @@ public class World {
                 }
             }
         }
+        
+        // Prune far chunks to save memory
+        int pruneRadius = radius + 2;
+        chunks.entrySet().removeIf(entry -> {
+            Chunk c = entry.getValue();
+            boolean far = Math.abs(c.cx - pcx) > pruneRadius || Math.abs(c.cz - pcz) > pruneRadius;
+            if (far) {
+                prunedChunks.add(c);
+            }
+            return far;
+        });
     }
 
     private void generateChunkData(Chunk chunk) {

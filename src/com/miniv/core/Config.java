@@ -58,6 +58,11 @@ public class Config {
     // Day cycle speed (how many real seconds per game day)
     public static float dayLengthSeconds = 60.0f; // Fast cycle for testing
     
+    // FPS Cap: -1 (VSync), 30, 60, 120, 0 (Unlimited)
+    public static int fpsCapIndex = 0;
+    public static final int[] fpsCaps = {-1, 30, 60, 120, 0};
+    public static int getFpsCap() { return fpsCaps[fpsCapIndex]; }
+    
     // World Seed
     public static String worldSeed = "123456789";
 

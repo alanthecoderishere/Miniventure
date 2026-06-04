@@ -33,7 +33,8 @@ public class Main {
     private Player player;
     private World world;
     private ChatSystem chat;
-    private float mpBroadcastTimer = 0f;  // throttle broadcast posisi ~10x/detik
+    private float mpBroadcastTimer = 0f;
+    private float mpHeartbeatTimer = 0f;
 
     public void run() {
         init();
@@ -83,10 +84,19 @@ public class Main {
                         chat.isSettingsOpen = !chat.isSettingsOpen;
                         chat.dirty = true;
                     }
+                } else if (key == GLFW_KEY_F5 && !chat.isTyping) {
+                    SupabaseMultiplayer.remotePlayers.clear();
+                    SupabaseMultiplayer.requestWorldSync();
+                    chat.addSystemMessage("Refreshing players...");
+                    chat.dirty = true;
                 }
                 
                 if (chat.isSettingsOpen) {
-                    if (key == GLFW_KEY_Q) {
+                    if (key == GLFW_KEY_F) {
+                        Config.fpsCapIndex = (Config.fpsCapIndex + 1) % Config.fpsCaps.length;
+                        glfwSwapInterval(Config.getFpsCap() == -1 ? 1 : 0);
+                        chat.dirty = true;
+                    } else if (key == GLFW_KEY_Q) {
                         Config.shadeQuality = (Config.shadeQuality + 1) % 5;
                         chat.dirty = true;
                     } else if (key == GLFW_KEY_R) {
@@ -292,6 +302,12 @@ public class Main {
 
                         byte block = world.getBlock(bx, by, bz);
                         if (block != Voxel.AIR) {
+                            if (currentPos.distance(center) > 5.5f) {
+                                block = Voxel.AIR; // Treat foreground occlusion block as air
+                            }
+                        }
+
+                        if (block != Voxel.AIR) {
                             // Hit a solid block. Check if it's within player's reach.
                             float dist = currentPos.distance(center);
                             if (dist <= 5.5f) {
@@ -445,6 +461,8 @@ public class Main {
         String mpName = String.format("Player_%03d", randNum);
         SupabaseMultiplayer.connectAsync(mpId, mpName);
         chat.addSystemMessage("Connecting to online class...");
+        
+        QuizBlockManager.fetchQuizzesFromDB();
     }
 
     private void loop() {
@@ -506,19 +524,26 @@ public class Main {
                 chat.dirty = true;
             }
 
-            // ── MULTIPLAYER: Broadcast posisi (throttle 10x/detik) ────────────
+            // ── MULTIPLAYER: Broadcast posisi (throttle 20x/detik & heartbeat 3s) ────────────
             mpBroadcastTimer += delta;
-            if (mpBroadcastTimer >= 0.1f) {
-                mpBroadcastTimer = 0f;
-                String[] dirs   = {"front", "back", "left", "right"};
-                String   mpDir  = dirs[Math.min(player.facing, 3)];
-                boolean  moving = isKeyPressed(GLFW_KEY_W) || isKeyPressed(GLFW_KEY_S)
-                               || isKeyPressed(GLFW_KEY_A) || isKeyPressed(GLFW_KEY_D);
-                SupabaseMultiplayer.broadcastPosition(
-                    player.position.x, player.position.y, player.position.z,
-                    mpDir, moving ? "walk" : "idle"
-                );
+            mpHeartbeatTimer += delta;
+            boolean moving = isKeyPressed(GLFW_KEY_W) || isKeyPressed(GLFW_KEY_S)
+                           || isKeyPressed(GLFW_KEY_A) || isKeyPressed(GLFW_KEY_D);
+                           
+            if (mpBroadcastTimer >= 0.05f) {
+                if (moving || mpHeartbeatTimer >= 3.0f) {
+                    mpBroadcastTimer = 0f;
+                    if (moving) mpHeartbeatTimer = 0f;
+                    String[] dirs   = {"front", "back", "left", "right"};
+                    String   mpDir  = dirs[Math.min(player.facing, 3)];
+                    SupabaseMultiplayer.broadcastPosition(
+                        player.position.x, player.position.y, player.position.z,
+                        mpDir, moving ? "walk" : "idle"
+                    );
+                }
             }
+            
+            SupabaseMultiplayer.updatePlayers(delta);
 
             try (MemoryStack stack = stackPush()) {
                 IntBuffer pW = stack.mallocInt(1);
@@ -530,6 +555,16 @@ public class Main {
 
             glfwSwapBuffers(window);
             glfwPollEvents();
+
+            if (Config.getFpsCap() > 0) {
+                long frameTime = System.nanoTime() - now;
+                long targetTime = 1000000000L / Config.getFpsCap();
+                if (frameTime < targetTime) {
+                    try {
+                        Thread.sleep((targetTime - frameTime) / 1000000L);
+                    } catch (InterruptedException e) {}
+                }
+            }
 
             frames++;
             if (System.currentTimeMillis() - timer > 1000) {

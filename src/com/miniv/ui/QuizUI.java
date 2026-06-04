@@ -190,6 +190,7 @@ public class QuizUI implements UIState {
 
             if (key == 257 || key == 335) { // ENTER
                 data.isLocked = true;
+                com.miniv.core.QuizBlockManager.saveQuizToDB(data);
                 UIManager.isDirty = true;
                 return;
             }
